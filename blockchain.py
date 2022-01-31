@@ -55,19 +55,19 @@ class Blockchain:
         encoded_block = json.dumps(block, sort_keys=True).encode()
         return hashlib.sha256(encoded_block).hexdigest()
     
-    def is_chain_valid(self, chain, difficulty=4):
+    def is_chain_valid(self, difficulty=4):
         '''This function checks if:
             - the previous blockchain is the same as current
             - Proof of work is valid - i.e. hash generated to mine a block is under given difficulty'''
-        previous_block = chain[0]
-        for block_index, block in enumerate(chain[1:]):
+        previous_block = self.chain[0]
+        for block_index, block in enumerate(self.chain[1:]):
             block_index += 1 # because enumerate allways returns index from zero
             # check previous block and current block if they are the same (after the hash function)
-            if block.previous_hash != self.hash(previous_block):
+            if block["previous_hash"] != self.hash(previous_block):
                 return False
             # check if block was validated - i.e. hash operation found a hash with given difficulty
-            previous_proof = previous_block.proof
-            proof = block.proof
+            previous_proof = previous_block['proof']
+            proof = block['proof']
             hash_operation = hashlib\
                             .sha256(str(proof**2 - previous_proof**2)\
                                         .encode())\
@@ -75,23 +75,25 @@ class Blockchain:
             if hash_operation[:4] != '0'*difficulty:
                 return False
             # go to the next block
-            previous_block = chain[block_index]
+            previous_block = self.chain[block_index]
+        return True
 
 # %% [markdown]
 ### Part 2 - mining the blockchain
 # %%
 app = Flask(__name__)
+app.config["JSONIFY_PRETTYPRINT_REGULAR"] = False
 
 blockchain = Blockchain()
 
-@app.route('/mine_block', method=["GET"])
+@app.route('/mine_block', methods=["GET"])
 def mine_block():
     # to mine a block we need two things
     # 1. we need to create a proof of work, this is created by taking
     # previous proof (previous block nonce) and currenct nonce, and passing it to sha256. 
     # We need to obtain hex number under certain difficulty (number of zeros at the beginning)
     previous_block = blockchain.get_previous_block()
-    previous_proof = previous_block.proof
+    previous_proof = previous_block['proof']
     proof = blockchain.proof_of_work(previous_proof)
     # 2. we need to create a hash from previous block
     previous_hash = blockchain.hash(previous_block)
@@ -99,10 +101,10 @@ def mine_block():
     block = blockchain.create_block(proof, previous_hash)
     response = {
         "message": "Congratulations, you just mined a block",
-        "index": block.index,
-        "timestamp": block.timestamp,
-        "proof": block.proof,
-        "previous_hash": block.previous_hash,
+        "index": block["index"],
+        "timestamp": block["timestamp"],
+        "proof": block['proof'],
+        "previous_hash": block["previous_hash"],
     }
     return jsonify(response), 200
 # %% [markdown]
@@ -115,3 +117,18 @@ def get_chain():
         "length": len(blockchain.chain)
     }
     return jsonify(response), 200
+# %%
+@app.route('/is_valid', methods = ["GET"])
+def is_valid():
+    is_valid = blockchain.is_chain_valid()
+    if is_valid:
+        return jsonify({
+        "message": "The blockchain is valid",
+        "is_valid": True
+    }), 200
+    return jsonify({
+        "message": "The blockchain is NOT VALID",
+        "is_valid": False
+    }), 200
+# %%
+app.run(host = "0.0.0.0", port = 5000)
