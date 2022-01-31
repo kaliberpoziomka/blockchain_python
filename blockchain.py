@@ -5,6 +5,7 @@ from email.encoders import encode_noop
 import hashlib
 import json
 from operator import ne
+from pydoc import resolve
 from attr import has
 from flask import Flask, jsonify
 
@@ -31,7 +32,7 @@ class Blockchain:
     
     def proof_of_work(self, previous_proof, difficulty = 4):
         '''This function mines a block using proof of work'''
-        new_proof = 1
+        new_proof = 1 # nonce
         check_proof = False
         while not check_proof:
             # operation in hash function must be non-symetrical,
@@ -79,3 +80,38 @@ class Blockchain:
 # %% [markdown]
 ### Part 2 - mining the blockchain
 # %%
+app = Flask(__name__)
+
+blockchain = Blockchain()
+
+@app.route('/mine_block', method=["GET"])
+def mine_block():
+    # to mine a block we need two things
+    # 1. we need to create a proof of work, this is created by taking
+    # previous proof (previous block nonce) and currenct nonce, and passing it to sha256. 
+    # We need to obtain hex number under certain difficulty (number of zeros at the beginning)
+    previous_block = blockchain.get_previous_block()
+    previous_proof = previous_block.proof
+    proof = blockchain.proof_of_work(previous_proof)
+    # 2. we need to create a hash from previous block
+    previous_hash = blockchain.hash(previous_block)
+    # now we can create block
+    block = blockchain.create_block(proof, previous_hash)
+    response = {
+        "message": "Congratulations, you just mined a block",
+        "index": block.index,
+        "timestamp": block.timestamp,
+        "proof": block.proof,
+        "previous_hash": block.previous_hash,
+    }
+    return jsonify(response), 200
+# %% [markdown]
+### Getting the full Blockchain
+# %%
+@app.route("/get_chain", methods = ["GET"])
+def get_chain():
+    response = {
+        "chain_key": blockchain.chain,
+        "length": len(blockchain.chain)
+    }
+    return jsonify(response), 200
